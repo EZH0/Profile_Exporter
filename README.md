@@ -31,15 +31,31 @@ Implemented:
 - Entry list
 - Bundle generation
 - Output box auto-select for user `Ctrl+C`
+- Separate scrollable bundle output window
+- Minimap button with a simple orange `PE` icon
 - Serializer for `WOW_PROFILE_VAULT` blocks
 - Adapter registry scaffold under `Adapters/Core.lua`
+- Auto Collect button that runs available adapters and adds/updates bundle entries
+- Adapter checkboxes saved in `ProfileExporterDB.adapters`
+- Details mode checkbox:
+  - Off: export only the current Details profile
+  - On: export every profile returned by `Details:GetProfileList()`
+- First-pass automatic adapters:
+  - ElvUI
+  - ElvUI WindTools
+  - Details!
+  - Plater
+  - Cell
+  - Cooldown Manager Centered
+  - DBM
+  - Sensei Resource Bar
+  - XIV Databar
+  - WoW Edit Mode
 - SavedVariables: `ProfileExporterDB`
 
 Not yet implemented:
 
-- Real automatic export adapters
 - In-game QA in WoW client
-- ScrollFrame polish for very large strings
 - Editing/deleting individual queued entries
 - Importing existing SavedVariables
 
@@ -75,18 +91,13 @@ profile string here
 
 ## Future Direction
 
-Automatic adapters can be added under `Adapters/`.
+Automatic adapters live under `Adapters/`.
 
-Planned adapters:
+Implemented adapters should still be verified in-game because several export APIs only exist after the target addon has fully loaded.
 
-- ElvUI
-- WindTools
-- DBM
-- Plater
-- Cell
-- EditMode
-- Sensei Resource Bar
-- Cooldown Manager Centered
+Remaining planned adapters:
+
+- None for the current profile bundle target
 
 Each adapter should return the same normalized entry shape used by the manual UI.
 
@@ -107,24 +118,27 @@ World of Warcraft/_retail_/Interface/AddOns/ProfileExporter/
 3. Verify:
 
 - frame opens
-- manual entry can be added
+- adapter checkboxes can be enabled/disabled
 - `Generate` produces valid `WOW_PROFILE_VAULT` text
-- output text can be selected and copied with `Ctrl+C`
+- output text opens in a scrollable window and can be selected/copied with `Ctrl+C`
+
+## Details Profile Handling
+
+Details can store multiple named profiles. Exporting all of them every time can make the bundle much larger and may publish old profiles the user no longer cares about.
+
+The default behavior is therefore conservative:
+
+- `Details: all profiles` unchecked: export only the currently active Details profile.
+- `Details: all profiles` checked: export each profile from `Details:GetProfileList()` as a separate `WOW_PROFILE_VAULT` block.
+
+Each exported Details block gets its own id, such as `details-main` or `details-raid`.
 
 4. Improve large text usability:
 
-- replace raw multiline edit boxes with scrollable edit boxes
 - add entry delete/edit buttons
 - add "copy instructions" text in UI
 
-5. Add adapters one by one:
-
-- ElvUI first
-- WindTools
-- DBM
-- Plater
-- Cell
-- EditMode
+5. Add more adapters when new profile-owning addons are added to the setup.
 
 ## Adapter Contract
 

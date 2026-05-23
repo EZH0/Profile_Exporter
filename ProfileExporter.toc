@@ -1,11 +1,23 @@
-## Interface: 110200
+## Interface: 120005
 ## Title: Profile Exporter
 ## Notes: Collect addon profile strings into one All The Profiles bundle.
 ## Author: EZH0
 ## Version: 0.1.0
+## IconTexture: Interface\AddOns\ProfileExporter\Media\PEIcon.tga
 ## SavedVariables: ProfileExporterDB
 
 Serializer.lua
 Adapters\Core.lua
+Adapters\ElvUI.lua
+Adapters\WindTools.lua
+Adapters\Details.lua
+Adapters\Plater.lua
+Adapters\Cell.lua
+Adapters\CooldownManagerCentered.lua
+Adapters\DBM.lua
+Adapters\Sensei.lua
+Adapters\XIV.lua
+Adapters\EditMode.lua
 Core.lua
 UI.lua
+Minimap.lua

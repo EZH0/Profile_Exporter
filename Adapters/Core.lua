@@ -10,6 +10,10 @@ function ns.RegisterAdapter(adapter)
   table.insert(ns.Adapters, adapter)
 end
 
+function ns.GetAdapters()
+  return ns.Adapters
+end
+
 function ns.GetAvailableAdapters()
   local available = {}
   for _, adapter in ipairs(ns.Adapters) do

@@ -8,11 +8,14 @@ local CONTENT_MARKER = "===== CONTENT ====="
 local END_MARKER = "===== WOW_PROFILE_VAULT END ====="
 
 local function trim(value)
-  return tostring(value or ""):gsub("^%s+", ""):gsub("%s+$", "")
+  local trimmed = tostring(value or ""):gsub("^%s+", "")
+  trimmed = trimmed:gsub("%s+$", "")
+  return trimmed
 end
 
 local function sanitizeHeader(value)
-  return trim(value):gsub("[\r\n]", " ")
+  local sanitized = trim(value):gsub("[\r\n]", " ")
+  return sanitized
 end
 
 local function addHeader(lines, key, value)

@@ -4,29 +4,57 @@ local UI = {}
 ns.UI = UI
 
 local frame
-local fields = {}
-local outputBox
+local statusText
+local outputFrame
+local bundleBox
+local bundleScrollFrame
 local listText
+local adapterChecks = {}
+local detailsAllProfilesCheck
+
+local function raiseFrame(target, strata, level)
+  if not target then
+    return
+  end
+
+  target:SetFrameStrata(strata or "DIALOG")
+  target:SetFrameLevel(level or 1000)
+  if target.Raise then
+    target:Raise()
+  end
+end
+
+local function createBorder(parent, r, g, b, a)
+  local top = parent:CreateTexture(nil, "OVERLAY")
+  top:SetColorTexture(r, g, b, a)
+  top:SetPoint("TOPLEFT", parent, "TOPLEFT", 2, -24)
+  top:SetPoint("TOPRIGHT", parent, "TOPRIGHT", -2, -24)
+  top:SetHeight(2)
+
+  local bottom = parent:CreateTexture(nil, "OVERLAY")
+  bottom:SetColorTexture(r, g, b, a)
+  bottom:SetPoint("BOTTOMLEFT", parent, "BOTTOMLEFT", 2, 2)
+  bottom:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", -2, 2)
+  bottom:SetHeight(2)
+
+  local left = parent:CreateTexture(nil, "OVERLAY")
+  left:SetColorTexture(r, g, b, a)
+  left:SetPoint("TOPLEFT", parent, "TOPLEFT", 2, -24)
+  left:SetPoint("BOTTOMLEFT", parent, "BOTTOMLEFT", 2, 2)
+  left:SetWidth(2)
+
+  local right = parent:CreateTexture(nil, "OVERLAY")
+  right:SetColorTexture(r, g, b, a)
+  right:SetPoint("TOPRIGHT", parent, "TOPRIGHT", -2, -24)
+  right:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", -2, 2)
+  right:SetWidth(2)
+end
 
 local function createLabel(parent, text, x, y)
   local label = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
   label:SetPoint("TOPLEFT", x, y)
   label:SetText(text)
   return label
-end
-
-local function createEditBox(parent, name, x, y, width, height, multiline)
-  createLabel(parent, name, x, y)
-  local box = CreateFrame("EditBox", nil, parent, multiline and "InputBoxTemplate" or "InputBoxTemplate")
-  box:SetPoint("TOPLEFT", x, y - 16)
-  box:SetSize(width, height)
-  box:SetAutoFocus(false)
-  box:SetFontObject(ChatFontNormal)
-  if multiline then
-    box:SetMultiLine(true)
-    box:SetMaxLetters(0)
-  end
-  return box
 end
 
 local function createButton(parent, text, x, y, width, onClick)
@@ -38,52 +66,166 @@ local function createButton(parent, text, x, y, width, onClick)
   return button
 end
 
-local function readField(key)
-  return fields[key] and fields[key]:GetText() or ""
+local function createCheckBox(parent, text, x, y, onClick)
+  local check = CreateFrame("CheckButton", nil, parent, "UICheckButtonTemplate")
+  check:SetPoint("TOPLEFT", x, y)
+  check:SetSize(22, 22)
+  check.label = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+  check.label:SetPoint("LEFT", check, "RIGHT", 2, 0)
+  check.label:SetText(text)
+  check:SetScript("OnClick", function(self)
+    onClick(self:GetChecked())
+  end)
+  return check
 end
 
-local function clearInputFields()
-  for _, key in ipairs({ "id", "addon", "name", "group", "format", "tags", "order", "instructions", "body" }) do
-    fields[key]:SetText("")
+local function setStatus(text)
+  if statusText then
+    statusText:SetText(text or "")
   end
 end
 
 local function refreshList()
   local entries = ns.Core:GetEntries()
   local lines = {}
+
   for index, entry in ipairs(entries) do
     table.insert(lines, index .. ". " .. (entry.addon or "Unknown") .. " - " .. (entry.name or "Profile"))
   end
-  listText:SetText(#lines > 0 and table.concat(lines, "\n") or "아직 추가된 항목이 없습니다.")
+
+  listText:SetText(#lines > 0 and table.concat(lines, "\n") or "No entries collected yet.")
 end
 
-local function addManualEntry()
-  ns.Core:AddEntry({
-    id = readField("id"),
-    addon = readField("addon"),
-    name = readField("name"),
-    group = readField("group"),
-    format = readField("format"),
-    tags = readField("tags"),
-    order = readField("order"),
-    instructions = readField("instructions"),
-    source = "manual",
-    body = readField("body")
-  })
-  clearInputFields()
-  refreshList()
+local function createBundleFrame()
+  if outputFrame then
+    return outputFrame
+  end
+
+  outputFrame = CreateFrame("Frame", "ProfileExporterBundleFrame", UIParent, "BasicFrameTemplateWithInset")
+  outputFrame:SetSize(760, 560)
+  outputFrame:SetPoint("CENTER", UIParent, "CENTER", 40, -20)
+  outputFrame:SetFrameStrata("DIALOG")
+  outputFrame:SetFrameLevel(1000)
+  outputFrame:SetToplevel(true)
+  outputFrame:SetClampedToScreen(true)
+  outputFrame:SetMovable(true)
+  outputFrame:EnableMouse(true)
+  outputFrame:RegisterForDrag("LeftButton")
+  outputFrame:SetScript("OnMouseDown", function(self)
+    raiseFrame(self, "DIALOG", 1000)
+  end)
+  outputFrame:SetScript("OnDragStart", function(self)
+    raiseFrame(self, "DIALOG", 1000)
+    self:StartMoving()
+  end)
+  outputFrame:SetScript("OnDragStop", outputFrame.StopMovingOrSizing)
+  outputFrame:Hide()
+  createBorder(outputFrame, 0.12, 0.58, 0.95, 0.95)
+
+  outputFrame.title = outputFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+  outputFrame.title:SetPoint("LEFT", outputFrame.TitleBg, "LEFT", 5, 0)
+  outputFrame.title:SetText("Profile Exporter Bundle")
+  outputFrame.title:SetTextColor(0.45, 0.85, 1)
+
+  local hint = outputFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  hint:SetPoint("LEFT", outputFrame, "TOPLEFT", 222, -54)
+  hint:SetText("Select All, then Ctrl+C")
+  hint:SetTextColor(0.75, 0.88, 1)
+
+  createButton(outputFrame, "Select All", 18, -42, 100, function()
+    raiseFrame(outputFrame, "DIALOG", 1000)
+    bundleBox:HighlightText()
+    bundleBox:SetFocus()
+  end)
+
+  createButton(outputFrame, "Close", 128, -42, 80, function()
+    outputFrame:Hide()
+  end)
+
+  local bodyBackground = outputFrame:CreateTexture(nil, "BACKGROUND")
+  bodyBackground:SetColorTexture(0.01, 0.015, 0.018, 0.92)
+  bodyBackground:SetPoint("TOPLEFT", outputFrame, "TOPLEFT", 14, -74)
+  bodyBackground:SetPoint("BOTTOMRIGHT", outputFrame, "BOTTOMRIGHT", -28, 14)
+
+  bundleScrollFrame = CreateFrame("ScrollFrame", "ProfileExporterBundleScrollFrame", outputFrame, "UIPanelScrollFrameTemplate")
+  bundleScrollFrame:SetPoint("TOPLEFT", 18, -78)
+  bundleScrollFrame:SetPoint("BOTTOMRIGHT", -32, 18)
+  bundleScrollFrame:SetFrameLevel(outputFrame:GetFrameLevel() + 5)
+
+  bundleBox = CreateFrame("EditBox", nil, bundleScrollFrame)
+  bundleBox:SetAutoFocus(false)
+  bundleBox:EnableMouse(true)
+  bundleBox:SetMultiLine(true)
+  bundleBox:SetMaxLetters(0)
+  bundleBox:SetFontObject(ChatFontNormal)
+  bundleBox:SetWidth(690)
+  bundleBox:SetHeight(430)
+  bundleBox:SetTextInsets(4, 4, 4, 4)
+  bundleBox:SetFrameLevel(bundleScrollFrame:GetFrameLevel() + 1)
+  bundleBox:SetScript("OnEscapePressed", function(self)
+    self:ClearFocus()
+  end)
+
+  bundleScrollFrame:SetScrollChild(bundleBox)
+  return outputFrame
+end
+
+local function showBundle(bundle)
+  local bundleFrame = createBundleFrame()
+  local text = bundle or ""
+  local approximateLines = math.max(30, math.ceil(string.len(text) / 95))
+  bundleBox:SetHeight(math.min(120000, approximateLines * 16 + 120))
+  bundleBox:SetText(text)
+  bundleFrame:Show()
+  raiseFrame(bundleFrame, "DIALOG", 1000)
+  bundleScrollFrame:SetVerticalScroll(0)
+  bundleBox:HighlightText(0, 0)
+  bundleBox:ClearFocus()
 end
 
 local function generateBundle()
   local bundle = ns.Core:BuildBundle()
-  outputBox:SetText(bundle)
-  outputBox:HighlightText()
-  outputBox:SetFocus()
+  showBundle(bundle)
+  setStatus("Bundle generated in a separate window.")
+end
+
+local function refreshAdapterControls()
+  for adapterId, check in pairs(adapterChecks) do
+    check:SetChecked(ns.Core:GetAdapterEnabled(adapterId))
+  end
+
+  if detailsAllProfilesCheck then
+    detailsAllProfilesCheck:SetChecked(ns.Core:GetOption("detailsAllProfiles") and true or false)
+  end
+end
+
+local function collectAdapters()
+  local results = ns.Core:CollectAdapters()
+  local lines = { "Auto collect results:" }
+
+  for _, result in ipairs(results) do
+    if result.skipped then
+      table.insert(lines, "- " .. result.label .. ": skipped")
+    elseif result.ok then
+      table.insert(lines, "- " .. result.label .. ": " .. result.count .. " added/updated")
+    else
+      table.insert(lines, "- " .. result.label .. ": unavailable or failed" .. (result.error and (" (" .. result.error .. ")") or ""))
+    end
+  end
+
+  refreshList()
+  setStatus(table.concat(lines, "\n"))
 end
 
 local function clearEntries()
   ns.Core:ClearEntries()
-  outputBox:SetText("")
+  setStatus("")
+  if bundleBox then
+    bundleBox:SetText("")
+  end
+  if outputFrame then
+    outputFrame:Hide()
+  end
   refreshList()
 end
 
@@ -93,50 +235,65 @@ function UI:Create()
   end
 
   frame = CreateFrame("Frame", "ProfileExporterFrame", UIParent, "BasicFrameTemplateWithInset")
-  frame:SetSize(760, 640)
+  frame:SetSize(880, 620)
   frame:SetPoint("CENTER")
+  frame:SetFrameStrata("MEDIUM")
+  frame:SetFrameLevel(100)
+  frame:SetToplevel(true)
+  frame:SetClampedToScreen(true)
   frame:SetMovable(true)
   frame:EnableMouse(true)
   frame:RegisterForDrag("LeftButton")
-  frame:SetScript("OnDragStart", frame.StartMoving)
+  frame:SetScript("OnDragStart", function(self)
+    raiseFrame(self, "MEDIUM", 100)
+    self:StartMoving()
+  end)
   frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
   frame:Hide()
+  createBorder(frame, 0.95, 0.68, 0.12, 0.85)
 
   frame.title = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
   frame.title:SetPoint("LEFT", frame.TitleBg, "LEFT", 5, 0)
   frame.title:SetText("Profile Exporter")
 
-  fields.id = createEditBox(frame, "ID", 18, -42, 170, 22)
-  fields.addon = createEditBox(frame, "Addon", 204, -42, 170, 22)
-  fields.name = createEditBox(frame, "Name", 390, -42, 170, 22)
-  fields.order = createEditBox(frame, "Order", 576, -42, 80, 22)
+  createButton(frame, "Auto Collect", 18, -42, 120, collectAdapters)
+  createButton(frame, "Generate", 148, -42, 110, generateBundle)
+  createButton(frame, "Clear", 268, -42, 90, clearEntries)
 
-  fields.group = createEditBox(frame, "Group", 18, -92, 170, 22)
-  fields.format = createEditBox(frame, "Format", 204, -92, 170, 22)
-  fields.tags = createEditBox(frame, "Tags", 390, -92, 266, 22)
-  fields.instructions = createEditBox(frame, "Instructions", 18, -142, 638, 22)
-  fields.body = createEditBox(frame, "Profile String", 18, -192, 310, 160, true)
+  createLabel(frame, "Enabled Adapters", 18, -84)
+  local adapters = ns.GetAdapters and ns.GetAdapters() or {}
+  for index, adapter in ipairs(adapters) do
+    local col = (index - 1) % 2
+    local row = math.floor((index - 1) / 2)
+    local x = 18 + (col * 215)
+    local y = -104 - (row * 24)
+    adapterChecks[adapter.id] = createCheckBox(frame, adapter.label or adapter.id, x, y, function(enabled)
+      ns.Core:SetAdapterEnabled(adapter.id, enabled)
+    end)
+  end
 
-  createButton(frame, "Add", 18, -372, 90, addManualEntry)
-  createButton(frame, "Generate", 118, -372, 110, generateBundle)
-  createButton(frame, "Clear", 238, -372, 90, clearEntries)
+  local adapterRows = math.ceil(#adapters / 2)
+  local detailsY = -112 - (adapterRows * 24)
+  detailsAllProfilesCheck = createCheckBox(frame, "Details: all profiles", 18, detailsY, function(enabled)
+    ns.Core:SetOption("detailsAllProfiles", enabled and true or false)
+  end)
 
-  createLabel(frame, "Current Bundle", 350, -192)
-  outputBox = CreateFrame("EditBox", nil, frame, "InputBoxTemplate")
-  outputBox:SetPoint("TOPLEFT", 350, -208)
-  outputBox:SetSize(380, 260)
-  outputBox:SetAutoFocus(false)
-  outputBox:SetMultiLine(true)
-  outputBox:SetMaxLetters(0)
-  outputBox:SetFontObject(ChatFontNormal)
-
-  createLabel(frame, "Added Entries", 18, -420)
+  createLabel(frame, "Added Entries", 18, detailsY - 38)
   listText = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-  listText:SetPoint("TOPLEFT", 18, -438)
+  listText:SetPoint("TOPLEFT", 18, detailsY - 56)
   listText:SetJustifyH("LEFT")
   listText:SetJustifyV("TOP")
-  listText:SetSize(700, 150)
+  listText:SetSize(420, 330)
 
+  createLabel(frame, "Status", 470, -42)
+  statusText = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  statusText:SetPoint("TOPLEFT", 470, -64)
+  statusText:SetJustifyH("LEFT")
+  statusText:SetJustifyV("TOP")
+  statusText:SetSize(380, 500)
+  statusText:SetText("")
+
+  refreshAdapterControls()
   refreshList()
   return frame
 end
@@ -145,6 +302,7 @@ function UI:Toggle()
   local createdFrame = self:Create()
   createdFrame:SetShown(not createdFrame:IsShown())
   if createdFrame:IsShown() then
+    refreshAdapterControls()
     refreshList()
   end
 end
