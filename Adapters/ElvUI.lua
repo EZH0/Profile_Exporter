@@ -1,5 +1,32 @@
 local addonName, ns = ...
 
+local exportTypes = {
+  {
+    dataType = "profile",
+    id = "elvui-import-1",
+    name = "ElvUI 1",
+    order = "10"
+  },
+  {
+    dataType = "private",
+    id = "elvui-import-2",
+    name = "ElvUI 2",
+    order = "20"
+  },
+  {
+    dataType = "global",
+    id = "elvui-import-3",
+    name = "ElvUI 3",
+    order = "30"
+  },
+  {
+    dataType = "filters",
+    id = "elvui-import-4",
+    name = "ElvUI 4",
+    order = "40"
+  }
+}
+
 ns.RegisterAdapter({
   id = "elvui",
   label = "ElvUI",
@@ -16,22 +43,29 @@ ns.RegisterAdapter({
       error("ElvUI Distributor export API is not available")
     end
 
-    local profileName, body = distributor:GetProfileExport("profile", nil, "text")
-    if not body or body == "" then
+    local entries = {}
+    for _, exportType in ipairs(exportTypes) do
+      local _, body = distributor:GetProfileExport(exportType.dataType, nil, "text")
+      if body and body ~= "" then
+        table.insert(entries, {
+          id = exportType.id,
+          addon = "ElvUI",
+          name = exportType.name,
+          group = "Elv UI",
+          format = "elvui",
+          tags = "ui, required",
+          order = exportType.order,
+          instructions = "ElvUI 프로필 가져오기 창에 붙여넣습니다.",
+          source = "official-export",
+          body = body
+        })
+      end
+    end
+
+    if #entries == 0 then
       error("ElvUI profile export returned empty text")
     end
 
-    return {
-      id = "elvui-" .. tostring(profileName or "current"):lower():gsub("[^%w_-]+", "-"),
-      addon = "ElvUI",
-      name = profileName or "Current Profile",
-      group = "Elv UI",
-      format = "elvui",
-      tags = "ui, required",
-      order = "10",
-      instructions = "ElvUI 프로필 가져오기 창에 붙여넣습니다.",
-      source = "official-export",
-      body = body
-    }
+    return entries
   end
 })

@@ -1,15 +1,5 @@
 local addonName, ns = ...
 
-local function slug(value)
-  value = tostring(value or ""):lower()
-  value = value:gsub("[^%w_-]+", "-")
-  value = value:gsub("^-+", ""):gsub("-+$", "")
-  if value == "" then
-    return "profile"
-  end
-  return value
-end
-
 local function copyTable(value, seen)
   if type(value) ~= "table" then
     return value
@@ -107,23 +97,15 @@ ns.RegisterAdapter({
       error("Cell profile export returned empty text")
     end
 
-    local profileName = "Cell Settings"
-    if _G.UnitName then
-      local playerName = _G.UnitName("player")
-      if playerName and playerName ~= "" then
-        profileName = playerName
-      end
-    end
-
     return {
-      id = "cell-" .. slug(profileName),
+      id = "cell-main",
       addon = "Cell",
-      name = profileName,
-      group = "Raid Frames",
+      name = "Cell",
+      group = "Cell",
       format = "cell",
-      tags = "raid-frame, required",
-      order = "140",
-      instructions = "Cell 옵션의 가져오기 창에 붙여넣습니다.",
+      tags = "party, raid",
+      order = "130",
+      instructions = "Cell 프로필 가져오기 창에 붙여넣습니다.",
       source = "official-export",
       body = body
     }
