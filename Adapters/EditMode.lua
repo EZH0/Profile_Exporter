@@ -62,7 +62,7 @@ ns.RegisterAdapter({
 
     local name = layout.layoutName or layout.name or "Current Layout"
     return {
-      id = "edit-mode-" .. tostring(name):lower():gsub("[^%w_-]+", "-"),
+      id = "edit-mode",
       addon = "Edit Mode",
       name = name,
       group = "Edit Mode",
